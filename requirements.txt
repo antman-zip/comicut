@@ -1,0 +1,12 @@
+google-generativeai
+pydantic
+python-dotenv
+Pillow
+fastapi
+uvicorn
+gradio
+httpx
+pypdf
+PyMuPDF
+pdfplumber
+openpyxl
