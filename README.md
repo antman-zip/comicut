@@ -13,13 +13,21 @@ ComiCut AI는 PDF나 텍스트로 된 리포트를 분석하여 웹툰 스타일
 
 ### 1. 사전 요구 사항 (필수)
 - **Windows 10 또는 11** 환경
-- **Python 3.10 이상** 설치 ([Python 다운로드](https://www.python.org/downloads/))
+- **Python 3.10 이상** 설치 ([Python 다운로드](https://www.python.org/downloads/release/python-31011/))
   - *설치 시 화면 하단의 "Add Python to PATH" 체크박스를 반드시 선택해주세요.*
+https://private-user-images.githubusercontent.com/251932985/530597468-28765ee7-c3ca-43e4-8122-fe58fd1e719e.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY5NzY1NjgsIm5iZiI6MTc2Njk3NjI2OCwicGF0aCI6Ii8yNTE5MzI5ODUvNTMwNTk3NDY4LTI4NzY1ZWU3LWMzY2EtNDNlNC04MTIyLWZlNThmZDFlNzE5ZS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyOVQwMjQ0MjhaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1iN2NhNDQzY2ZlYWRiNDNjYTY3ZjAyOTdiMTEyYTE2NmEyMWUyYWU1NzI2M2IzY2ZiZjUwZTFiZGRmM2E3Y2FmJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.D7huqR8UVnbWcsF127kXwl53lLHAmNeXxKKlypVrIAU
+
+https://private-user-images.githubusercontent.com/251932985/530597975-7f1d434e-2bc6-413a-a47f-bd1d2613f379.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY5NzY5MTMsIm5iZiI6MTc2Njk3NjYxMywicGF0aCI6Ii8yNTE5MzI5ODUvNTMwNTk3OTc1LTdmMWQ0MzRlLTJiYzYtNDEzYS1hNDdmLWJkMWQyNjEzZjM3OS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyOVQwMjUwMTNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1mMjZhMmIxYmI0Mjg2YzViZGUwMThkODg5MTdmMzA2NTRjNDIxY2Y3ZmQyNmI1MjAyOGYyNzY1YjQ2ZTdmYWU5JlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.BbKejtvtkJ9MQHEYJV-7suNBUGozU-4ZT5kXpTNbB_4
+
+https://private-user-images.githubusercontent.com/251932985/530597465-d344a5bc-d4db-48fd-a01a-7b6c300154c1.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY5NzY5MTMsIm5iZiI6MTc2Njk3NjYxMywicGF0aCI6Ii8yNTE5MzI5ODUvNTMwNTk3NDY1LWQzNDRhNWJjLWQ0ZGItNDhmZC1hMDFhLTdiNmMzMDAxNTRjMS5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyOVQwMjUwMTNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1hMDVhNjlmMjZjY2NlYTlkNDFiOTdmMTc2MmIxOTM1MzBmY2Y0ZjJiNzk1ZDMyNjM0ODJhZTUyZGM0NGZkMGUwJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.XUDl13JUsLdv6Qzw68Y2h_ACPtRnd2HLoiE4Grp_xWc
+
+https://private-user-images.githubusercontent.com/251932985/530597467-0996f5fe-5706-4642-8065-fe440c7c14dd.png?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NjY5NzY5MTMsIm5iZiI6MTc2Njk3NjYxMywicGF0aCI6Ii8yNTE5MzI5ODUvNTMwNTk3NDY3LTA5OTZmNWZlLTU3MDYtNDY0Mi04MDY1LWZlNDQwYzdjMTRkZC5wbmc_WC1BbXotQWxnb3JpdGhtPUFXUzQtSE1BQy1TSEEyNTYmWC1BbXotQ3JlZGVudGlhbD1BS0lBVkNPRFlMU0E1M1BRSzRaQSUyRjIwMjUxMjI5JTJGdXMtZWFzdC0xJTJGczMlMkZhd3M0X3JlcXVlc3QmWC1BbXotRGF0ZT0yMDI1MTIyOVQwMjUwMTNaJlgtQW16LUV4cGlyZXM9MzAwJlgtQW16LVNpZ25hdHVyZT1kZDc0NjFkYWVlNzI4NTRmZGM2MGNjZTVkNGUzNDQ1NDQwYzZiZWYyMDMxNWM2MjhjZWU0Nzg4YTUzZTY2NjZjJlgtQW16LVNpZ25lZEhlYWRlcnM9aG9zdCJ9.5Mq5YmDv84n5KkbAooyd7kipzJAibTsH8_RV3Jnm5E4
+
 
 ### 2. 자동 설치 (권장)
 폴더 내의 `install.bat` 파일을 더블 클릭하세요.
 - 자동으로 가상환경(`venv`)을 생성하고 필요한 모든 라이브러리를 설치합니다.
-- 설치가 완료되면 `.env` 파일을 설정하라는 안내가 나옵니다.
+- 설치가 완료되면 `.env` 파일을 설정하라는 안내가 나옵니다. `.env` 파일은 이미지 생성에 필요한 api 키를 저장하는 파일이며, 보안상의 이유로 설치파일에는 들어있지 않습니다.
 
 ### 3. 수동 설치
 자동 설치가 실패할 경우, 터미널(CMD 또는 PowerShell)을 열고 아래 명령어를 순서대로 입력하세요.
@@ -43,7 +51,6 @@ pip install -r requirements.txt
 # .env 파일 예시
 GEMINI_API_KEY=(여기에 발급받은 키를 붙여넣으세요)
 ```
-> API Key는 [Google AI Studio](https://aistudio.google.com/)에서 무료로 발급받을 수 있습니다.
 
 ## 🚀 실행 방법
 

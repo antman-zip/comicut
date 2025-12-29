@@ -9,3 +9,4 @@ __pycache__/
 # Project specific
 tmp/
 generated_images/
+aeests/
