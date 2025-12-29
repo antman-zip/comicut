@@ -16,18 +16,21 @@ ComiCut AI는 PDF나 텍스트로 된 리포트를 분석하여 웹툰 스타일
 - **Python 3.10 이상** 설치 ([Python 다운로드](https://www.python.org/downloads/release/python-31011/))
   - *설치 시 화면 하단의 "Add Python to PATH" 체크박스를 반드시 선택해주세요.*
 
-아래 이미지는 프로그램 구동에 필요한 파이썬 3.10.11 버전 설치 가이드입니다.
+- 아래 이미지는 프로그램 구동에 필요한 파이썬 3.10.11 버전 설치 가이드입니다.
 
-1. 상술된 파이썬 설치 링크에 접속해 맨 아래로 스크롤합니다.
+## 1. 상술된 파이썬 설치 링크에 접속해 맨 아래로 스크롤합니다.
 <img width="2000" height="1047" alt="Image" src="https://github.com/user-attachments/assets/28765ee7-c3ca-43e4-8122-fe58fd1e719e" />
 
-2. 윈도우용 64비트 설치파일을 다운로드 받고 설치파일을 실행합니다.
+
+## 2. 윈도우용 64비트 설치파일을 다운로드 받고 설치파일을 실행합니다.
 <img width="1867" height="885" alt="Image" src="https://github.com/user-attachments/assets/7f1d434e-2bc6-413a-a47f-bd1d2613f379" />
 
-3. "Add Python to PATH" 체크박스가 선택된 것을 확인하고 다운로드합니다.
+
+## 3. "Add Python to PATH" 체크박스가 선택된 것을 확인하고 다운로드합니다.
 <img width="934" height="331" alt="Image" src="https://github.com/user-attachments/assets/5b0ac0d5-7153-49a4-9948-130da4eaa476" />
 
-4. 잘 설치되었는지 확인하면 준비 완료입니다.
+
+## 4. 잘 설치되었는지 확인하면 준비 완료입니다.
 <img width="1745" height="981" alt="Image" src="https://github.com/user-attachments/assets/0996f5fe-5706-4642-8065-fe440c7c14dd" />
 
 
