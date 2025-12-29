@@ -15,7 +15,6 @@ from fastapi import FastAPI, UploadFile, File, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from pypdf import PdfReader
 
 # Import core types and services
 from models import (
@@ -34,6 +33,7 @@ from services.gemini_service import (
     parse_script,
     generate_panel_image,
 )
+import services.gemini_service as gemini_service
 
 # --- Application Setup ---
 app = FastAPI(
@@ -53,7 +53,6 @@ async def get_icon():
     icon_path = "icon.png"
     if os.path.exists(icon_path):
         return FileResponse(icon_path)
-    # Fallback if file doesn't exist (optional: return a default or 404)
     raise HTTPException(status_code=404, detail="Icon not found")
 
 # --- Logging Setup ---
@@ -102,6 +101,7 @@ state = AppState()
 class CharacterUpdateRequest(BaseModel):
     name: str
     image: Optional[str] = None
+    description: Optional[str] = ""
     enabled: bool
 
 class GenerationRequest(BaseModel):
@@ -156,7 +156,7 @@ async def process_facts():
         is_path = False
     else:
         raise HTTPException(status_code=400, detail="No report loaded.")
-    state.add_log(f"Extracting facts from {'PDF file' if is_path else 'text'}...")
+    state.add_log(f"Extracting facts from {'PDF file' if is_path else 'text'}")
     try:
         facts_dict = await process_report_to_facts(source, is_file_path=is_path)
         state.pipeline.fact_data = facts_dict
@@ -254,7 +254,7 @@ async def _generation_workflow(script_text: str):
         ]
         for p in new_panels: state.panels[p.id] = p
         
-        # Global Context: Use the full refined script as the background story context
+        # Global Context
         global_context = state.pipeline.final_scenario or script_text
         
         for i, panel in enumerate(new_panels):
@@ -262,7 +262,7 @@ async def _generation_workflow(script_text: str):
                 state.add_log("Generation stopped.", "info")
                 break
             
-            # Local Context: Previous and Next cut descriptions
+            # Local Context
             prev_desc = new_panels[i-1].description if i > 0 else None
             next_desc = new_panels[i+1].description if i < len(new_panels) - 1 else None
             
@@ -301,15 +301,12 @@ async def regenerate_panel(request: RegenerateRequest):
     if state.is_generating: raise HTTPException(status_code=409, detail="Busy.")
     panel = state.panels.get(request.panel_id)
     if not panel: raise HTTPException(status_code=404)
-    # Regenerate without specific context flow for now, or we could look up neighbors if needed.
-    # Currently just regenerating the single panel based on description.
     await _generate_single_panel_task(request.panel_id, request.new_description, global_context=state.pipeline.final_scenario)
     return state.panels.get(request.panel_id)
 
 async def _save_image_to_file(base64_string: str, panel_id: str) -> str:
     try:
         header, base64_data = base64_string.split(',', 1)
-        # Determine extension from header
         file_ext = "png"
         if "jpeg" in header or "jpg" in header:
             file_ext = "jpeg"
@@ -321,7 +318,6 @@ async def _save_image_to_file(base64_string: str, panel_id: str) -> str:
         
         with open(file_path, "wb") as f:
             f.write(base64.b64decode(base64_data))
-        # Return absolute file path for Gradio
         return file_path
     except Exception as e:
         print(f"Error saving image: {e}")
@@ -339,10 +335,9 @@ async def _generate_single_panel_task(
     panel.status = "generating"
     panel.description = description
     try:
-        state.add_log(f"Generating image for Cut #{panel.cutNumber}...")
+        state.add_log(f"Generating image for Cut #{panel.cutNumber}")
         enabled_chars = [c for c in state.characters.values() if c.enabled]
         
-        # Unpack result: image_data and used_prompt
         base64_image, used_prompt = await generate_panel_image(
             description, 
             enabled_chars, 
@@ -352,7 +347,6 @@ async def _generate_single_panel_task(
             next_desc=next_desc
         )
         
-        # Log the full prompt
         state.add_log(f"[PROMPT Cut #{panel.cutNumber}]\n{used_prompt}", "info")
         
         image_url = await _save_image_to_file(base64_image, panel.id)
@@ -379,6 +373,7 @@ def update_character(char_id: str, payload: CharacterUpdateRequest):
     char = state.characters[char_id]
     char.name = payload.name
     char.image = payload.image
+    char.description = payload.description
     char.enabled = payload.enabled
     return char
 
@@ -390,12 +385,12 @@ def remove_character(char_id: str):
 @app.get("/characters/", response_model=List[Character])
 def get_characters(): return list(state.characters.values())
 
-# --- ZIP Download Logic ---
-def create_zip_file_locally():
+# --- ZIP Download & Utilities ---
+def create_images_zip():
     """Creates a zip file in the tmp directory and returns its path."""
     completed_panels = [p for p in state.panels.values() if p.status == "completed" and p.imageUrl]
     if not completed_panels:
-        return None
+        raise ValueError("No images to zip.")
 
     tmp_dir = os.path.join(os.getcwd(), "tmp")
     os.makedirs(tmp_dir, exist_ok=True)
@@ -404,26 +399,37 @@ def create_zip_file_locally():
 
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
         for panel in completed_panels:
-            if panel.imageUrl:
-                # panel.imageUrl is now a local file path
-                try:
-                    if os.path.exists(panel.imageUrl):
-                        filename = os.path.basename(panel.imageUrl)
-                        ext = filename.split('.')[-1]
-                        zf.write(panel.imageUrl, arcname=f"cut_{panel.cutNumber}.{ext}")
-                except Exception as e:
-                    print(f"Error zipping {panel.imageUrl}: {e}")
-            # Base64 fallback removed as we enforce file saving now
+            if panel.imageUrl and os.path.exists(panel.imageUrl):
+                filename = os.path.basename(panel.imageUrl)
+                ext = filename.split('.')[-1]
+                zf.write(panel.imageUrl, arcname=f"cut_{panel.cutNumber}.{ext}")
     return zip_path
 
-@app.post("/create-zip/", summary="Create zip file and return path.")
-def create_zip_endpoint():
-    zip_path = create_zip_file_locally()
-    if not zip_path:
-        raise HTTPException(status_code=404, detail="No images to zip.")
-    return {"path": zip_path}
+@app.post("/create-zip/")
+async def create_zip_endpoint():
+    try:
+        zip_path = create_images_zip()
+        return {"path": zip_path}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
-# Mount UI
-import gradio as gr
+@app.post("/analyze-image/")
+async def analyze_image_endpoint(file: UploadFile = File(...)):
+    """Analyzes an uploaded image and returns visual keywords."""
+    try:
+        contents = await file.read()
+        description = await gemini_service.analyze_character_visual(contents)
+        return {"description": description}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- Mount Gradio UI ---
+from gradio import mount_gradio_app
 from ui import create_ui
-gradio_app = gr.mount_gradio_app(app, create_ui(), path="/ui")
+
+ui = create_ui()
+app = mount_gradio_app(app, ui, path="/ui")
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

@@ -1,12 +1,15 @@
-from pydantic import BaseModel
-from typing import List, Optional, Literal, Dict, Any
+import uuid
+from typing import List, Optional, Dict, Any, Literal
 from datetime import datetime
+from pydantic import BaseModel, Field
 
+# --- Data Models ---
 class Character(BaseModel):
-    id: str
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     name: str
-    image: Optional[str] = None # Base64
-    enabled: bool
+    image: Optional[str] = None  # Base64 encoded image
+    description: str = ""  # New: User's text description (e.g., "Blue suit, short black hair")
+    enabled: bool = True
 
 ImageResolution = Literal['1K', '2K', '4K']
 

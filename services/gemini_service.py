@@ -51,6 +51,27 @@ def load_user_prompt(filename: str) -> str:
     except FileNotFoundError:
         return f"Error: Prompt file '{filename}' not found."
 
+# --- Helper: Image Analysis ---
+async def analyze_character_visual(image_bytes: bytes) -> str:
+    """Analyzes a character image and returns short visual keywords."""
+    # Using the latest fast model for vision tasks
+    model = genai.GenerativeModel("gemini-3-flash-preview")
+    
+    prompt = """
+    Analyze this character image and provide a visual description in short, comma-separated keywords (Korean).
+    Focus on: Hair style/color, Eye shape/color, Clothing details, Accessories, and distinct features.
+    Example: 검은 단발머리, 파란 정장, 빨간 넥타이, 안경 착용, 차분한 인상
+    Output ONLY the keywords.
+    """
+    
+    try:
+        img = Image.open(io.BytesIO(image_bytes))
+        response = await model.generate_content_async([prompt, img])
+        return response.text.strip()
+    except Exception as e:
+        print(f"Image analysis error: {e}")
+        return "이미지 분석 실패"
+
 # --- Pipeline Step 1: Ingest Report (Uses user logic) ---
 async def process_report_to_facts(report_source: str, is_file_path: bool = False) -> Dict[str, Any]:
     """
@@ -112,13 +133,24 @@ async def parse_script(script_text: str) -> List[ScriptCut]:
     model = genai.GenerativeModel(PARSE_MODEL)
     
     prompt = f"""
-    Analyze the following comic script. Break it down into individual cuts (panels). 
+    Analyze the following comic script and break it down into individual cuts (panels). 
     Return a JSON array where each object contains:
     - cutNumber (int)
-    - description (string): The COMPLETE visual description for the image generator. 
-      WARNING: Do not truncate or summarize the description. Include all details, character actions, and dialogue instructions exactly as they appear in the script.
+    - description (string): A highly detailed visual description for an AI image generator.
+
+    [COMPOSITION & DIRECTING RULES FOR 'description']
+    1. **Static/Calm**: DO NOT describe dynamic actions (running, jumping, fighting). Keep poses static or subtle.
+    2. **Characters**: Limit to 1 or 2 characters max per cut.
+    3. **Assets/Objects**: If the cut describes an abstract 'Image/Asset' (logo, chart, chip, product), describe it EXACTLY as: "A [Object Name] placed in the center of a Solid Background." Do not describe a complex background for these cuts.
     
-    The script is already formatted for image generation. Just extract the fields. 
+    [TEXT & DIALOGUE RULES]
+    1. **NO On-Screen Text**: Do NOT include instructions for subtitles, labels, or titles.
+    2. **Speech Bubbles**: If there is dialogue, explicitly write: "Includes a speech bubble with the text: '[Dialogue Content]'." 
+    3. **Split Long Dialogue**: If a dialogue line is very long (>50 chars), describe it as "multiple speech bubbles".
+    4. **Clean Content**: Ensure the dialogue text in the description is exact.
+
+    [NEGATIVE RULES]
+    1. **Remove Metadata**: STRIP OUT all references like "Ref 123", "Fact 1", "Source:", "Page 2". The description must contain NO meta-data.
     
     Script:
     {script_text}
@@ -138,8 +170,6 @@ async def parse_script(script_text: str) -> List[ScriptCut]:
         return [ScriptCut(**item) for item in data]
     except Exception as e:
         print(f"Error parsing script JSON: {e}")
-        # Fallback: Try to find JSON block if the model was chatty
-        # (Simplified logic for now)
         raise ValueError("Failed to parse script structure.") from e
 
 # --- Pipeline Step 5: Generate Image (Existing) ---
@@ -154,46 +184,60 @@ async def generate_panel_image(
     """Step 5: Generate the image for a specific panel."""
     model = genai.GenerativeModel(IMAGE_GEN_MODEL)
 
-    # User's Custom Korean Prompt + 1:1 Aspect Ratio Enforcement
-    full_prompt = f"""한국 웹툰 스타일의 고품질 컷(1컷) 이미지를 생성하세요. (1:1 비율 준수)
-
-[스타일/톤]
-- 차분한 분위기, 과장된 코믹 연출 금지
-- 깔끔한 선화, 적당한 채색, 과한 광원/네온/현란한 배경 금지
-- 배경에 이미지/에셋에 해당하는 배경 혹은 오브젝트 배치
-- 색감은 저채도(파스텔/뉴트럴) 위주, 대비 과하지 않게
-- 해상도는 1:1 비율(Square)로 출력.
-
-[구도/연출]
-- 역동적인 액션(달리기/점프/격투) 금지
-- 장면은 단일 인물 또는 2인까지, 화면이 복잡해지지 않게
-- **중요**: 시나리오에 '이미지/에셋'(예: 로고, 칩, 제품, 특정 사물)이 묘사된 컷은 배경 묘사를 생략하고 반드시 "단색 배경(Solid Background) 중앙에 배치된 [사물]" 형태로 묘사하여 깔끔하게 출력되도록 할 것.
-
-[텍스트 규칙 — 매우 중요]
-- 온스크린 텍스트(자막/설명문/수치 텍스트/제목/라벨) 생성 금지
-- 예외는 오직 "말풍선" 안의 대사 1개(또는 대화 2개)만 허용, 50자 넘어가는 대사는 문장마다 말풍선 하나씩 추가.
-- 말풍선은 반드시 포함 (speech bubble 필수)
-- **핵심**: 말풍선 안에 대사를 가능한 정확하게 기입할 것.
-
-[장면 설명]
-{prompt}"""
+    # 1. Construct Character Context (Narrative Style)
+    enabled_chars = [c for c in characters if c.enabled]
+    char_descriptions = []
     
-    enabled_chars = [c for c in characters if c.enabled and c.image]
-    if enabled_chars:
-        char_names = ", ".join([c.name for c in enabled_chars])
-        full_prompt += f"""
+    for c in enabled_chars:
+        desc = f"Name: {c.name}"
+        if c.description:
+            desc += f", Appearance: {c.description}"
+        char_descriptions.append(desc)
+    
+    char_block = "\n".join(char_descriptions)
 
-[캐릭터 일관성 유지 - 필수]
-- 등장 인물: {char_names}
-- **참조 이미지 준수**: 제공된 캐릭터 참조 이미지의 시각적 디테일(헤어스타일, 색상, 눈 모양, 의상 등)을 **정확히** 따를 것.
-- 장면 설명에 의상 변경 지시가 없다면 참조 이미지의 의상을 그대로 유지할 것."""
+    # 2. Build Structured Prompt
+    full_prompt = f"""
+    한국 웹툰 스타일의 고품질 컷(1컷) 이미지를 생성하세요. (1:1 비율 준수)
 
+    [스타일 가이드 / Style Guide]
+    1. **캐릭터 (Character Style)**:
+       - **Anime Coloring, Flat Color**: 평면적이고 깔끔한 셀 채색(Cel-shading) 스타일.
+       - 과도한 그라데이션이나 3D 느낌을 배제하고, 선명한 라인과 단색 위주의 채색 사용.
+    
+    2. **배경 및 에셋 (Background & Asset Style)**:
+       - **Realistic Learning-Manga Style Anime**: 실사에 가까운 디테일한 학습만화풍 애니메이션 스타일.
+       - 배경이나 사물(에셋)은 캐릭터보다 더 사실적이고 밀도 있게 묘사하여 깊이감을 줄 것.
+
+    [전체 톤앤매너]
+    - 차분한 분위기, 과장된 코믹 연출 금지.
+    - 색감은 저채도 위주로 안정감 있게.
+    - 해상도는 1:1 비율(Square) 필수.
+
+    [캐릭터 정보]
+    {char_block}
+    - **의상 고정 (CRITICAL OUTFIT ENFORCEMENT)**:
+      1. 위 [캐릭터 정보]에 적힌 외관(의상, 헤어 등)이 **절대적인 우선순위**를 가짐.
+      2. 아래 [장면 설명]에 '정장(suit)', '유니폼' 등 다른 의상 묘사가 나오더라도 **전부 무시(IGNORE)**하고, 반드시 위 캐릭터 정보의 의상을 입힐 것.
+      3. 캐릭터의 고유 외관을 유지하는 것이 가장 중요함.
+
+    [장면 설명]
+    {prompt}
+    """
+    
+    # 3. Add Reference Images
     content_parts: list = [full_prompt]
 
     for char in enabled_chars:
         if char.image:
             try:
-                header, base64_data = char.image.split(',', 1)
+                # Handle data URI or base64 raw
+                img_data_str = char.image
+                if "," in img_data_str:
+                    header, base64_data = img_data_str.split(',', 1)
+                else:
+                    base64_data = img_data_str
+                
                 image_data = base64.b64decode(base64_data)
                 img = Image.open(io.BytesIO(image_data))
                 content_parts.append(img)
