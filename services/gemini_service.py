@@ -94,7 +94,7 @@ async def generate_scenario_draft(fact_data: Dict[str, Any]) -> str:
 async def refine_scenario(draft_scenario: str) -> str:
     """Step 3: Refine the draft scenario for image generation using the Validation Prompt."""
     model = genai.GenerativeModel(WRITER_MODEL)
-    validation_prompt = load_user_prompt("검증프롬프트_ko.md")
+    validation_prompt = load_user_prompt("verification_prompt_ko.md")
     
     full_prompt = f"""
     {validation_prompt}
