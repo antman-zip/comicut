@@ -92,11 +92,11 @@ def update_final_api(text: str) -> str:
     except Exception as e:
         return f"❌ 저장 실패: {e}"
 
-def start_generation_on_api(script_text: str = None) -> str:
+def start_generation_on_api(script_text: str = None, resolution: str = "1K") -> str:
     try:
-        payload = {}
+        payload = {"resolution": resolution}
         if script_text and script_text.strip():
-            payload = {"script_text": script_text}
+            payload["script_text"] = script_text
         response = client.post(f"{API_URL}/generate/start/", json=payload)
         response.raise_for_status()
         return "🚀 이미지 생성이 시작되었습니다."
@@ -310,7 +310,7 @@ def create_ui():
                 yield f"❌ 캐릭터 동기화 오류: {e}", [], ""
                 return
 
-            msg = start_generation_on_api(final_scenario_text)
+            msg = start_generation_on_api(final_scenario_text, resolution=res)
             yield msg, [], ""
             
             last_img_count = -1

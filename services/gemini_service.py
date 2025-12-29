@@ -8,6 +8,10 @@ import google.generativeai as genai
 from google.generativeai.types import GenerationConfig, HarmCategory, HarmBlockThreshold
 from PIL import Image
 
+# New SDK Imports
+from google import genai as new_genai
+from google.genai import types as new_types
+
 # Import models
 from models import Character, ImageResolution, ScriptCut, FactBank
 
@@ -181,8 +185,9 @@ async def generate_panel_image(
     prev_desc: str = None,
     next_desc: str = None
 ) -> tuple[str, str]:
-    """Step 5: Generate the image for a specific panel."""
-    model = genai.GenerativeModel(IMAGE_GEN_MODEL)
+    """Step 5: Generate the image for a specific panel using the new Google GenAI SDK."""
+    # Initialize new client
+    client = new_genai.Client(api_key=API_KEY)
 
     # 1. Construct Character Context (Narrative Style)
     enabled_chars = [c for c in characters if c.enabled]
@@ -227,7 +232,7 @@ async def generate_panel_image(
     
     # 3. Add Reference Images
     content_parts: list = [full_prompt]
-
+    
     for char in enabled_chars:
         if char.image:
             try:
@@ -245,24 +250,47 @@ async def generate_panel_image(
                 print(f"Skipping character image {char.name}: {e}")
 
     try:
-        response = await model.generate_content_async(content_parts, safety_settings=SAFETY_SETTINGS)
+        # Use new SDK's async generate_content
+        # Map resolution string to valid image_size options if needed, but "1K"/"2K" are standard.
+        target_res = resolution if resolution in ["1K", "2K", "4K"] else "1K"
         
-        b64_str = None
-        # Check output structure (Inline data)
-        if response.parts and hasattr(response.parts[0], 'inline_data'):
-             d = response.parts[0].inline_data
-             b64_str = base64.b64encode(d.data).decode('utf-8')
-             return f"data:{d.mime_type};base64,{b64_str}", full_prompt
+        # NOTE: After upgrading to google-genai v1.56.0+, image_config is supported.
+        # We pass it as a dictionary which the SDK converts to the appropriate config object.
+        gen_config_dict = {
+            'response_modalities': ['IMAGE'],
+            'image_config': {
+                'aspect_ratio': '1:1',
+                'image_size': target_res
+            }
+        }
         
-        # Check candidates fallback
-        if response.candidates and response.candidates[0].content.parts:
-             p = response.candidates[0].content.parts[0]
-             if hasattr(p, 'inline_data'):
-                 b64_str = base64.b64encode(p.inline_data.data).decode('utf-8')
-                 return f"data:{p.inline_data.mime_type};base64,{b64_str}", full_prompt
+        response = await client.aio.models.generate_content(
+            model=IMAGE_GEN_MODEL,
+            contents=content_parts,
+            config=gen_config_dict
+        )
+        
+        # Extract image data
+        # New SDK response structure usually nests parts under candidates
+        candidates = getattr(response, 'candidates', [])
+        if candidates and candidates[0].content and candidates[0].content.parts:
+            for part in candidates[0].content.parts:
+                if part.inline_data:
+                    # part.inline_data.data is bytes
+                    mime_type = part.inline_data.mime_type or "image/png"
+                    b64_str = base64.b64encode(part.inline_data.data).decode('utf-8')
+                    return f"data:{mime_type};base64,{b64_str}", full_prompt
+        
+        # Fallback: check if 'parts' exists directly (legacy/shortcut)
+        if hasattr(response, 'parts') and response.parts:
+             for part in response.parts:
+                if part.inline_data:
+                    mime_type = part.inline_data.mime_type or "image/png"
+                    b64_str = base64.b64encode(part.inline_data.data).decode('utf-8')
+                    return f"data:{mime_type};base64,{b64_str}", full_prompt
 
-        raise ValueError("No image data returned.")
+        raise ValueError("No image data returned from new SDK.")
 
     except Exception as e:
-        print(f"Image gen error: {e}")
+        print(f"Image gen error (New SDK): {e}")
         raise

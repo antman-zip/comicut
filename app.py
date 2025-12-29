@@ -106,6 +106,7 @@ class CharacterUpdateRequest(BaseModel):
 
 class GenerationRequest(BaseModel):
     script_text: Optional[str] = None
+    resolution: Optional[str] = "1K"
 
 class RegenerateRequest(BaseModel):
     panel_id: str
@@ -222,16 +223,21 @@ def update_final(payload: UpdateScenarioRequest):
 async def start_generation(background_tasks: BackgroundTasks, request: Optional[GenerationRequest] = None):
     if state.is_generating:
         raise HTTPException(status_code=409, detail="A generation process is already running.")
+    
     script_source = None
-    if request and request.script_text:
-        script_source = request.script_text
-    else:
+    if request:
+        if request.script_text:
+            script_source = request.script_text
+        if request.resolution:
+            state.resolution = request.resolution
+            
+    if not script_source:
         script_source = state.pipeline.final_scenario or state.pipeline.draft_scenario
     if not script_source:
          raise HTTPException(status_code=400, detail="No scenario found.")
     state.reset_for_generation()
     state.is_generating = True
-    state.add_log("Starting image generation process...")
+    state.add_log(f"Starting image generation process (Resolution: {state.resolution})...")
     background_tasks.add_task(_generation_workflow, script_source)
     return {"message": "Generation process started."}
 
